@@ -1,7 +1,9 @@
 *.o
 
 Colleen
-Grace
-Sully
 
+Grace
 Grace_kid.c
+
+Sully
+Sully_*
