@@ -26,6 +26,7 @@ clean:
 fclean: clean
 	rm -f $(NAME)
 	rm -f Grace_kid.c
+	rm -f Sully_*
 
 re: fclean all
 
