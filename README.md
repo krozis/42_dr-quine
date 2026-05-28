@@ -6,27 +6,29 @@
 
 ## Table of Contents
 
-1. [What is a Quine?](#what-is-a-quine)
-2. [Rules](#rules)
-3. [Project Structure](#project-structure)
-4. [C — Colleen](#c--colleen)
-   - [How it works](#how-it-works)
-   - [The technique — %c / %s trick](#the-technique--c--s-trick)
-   - [Constraints met](#constraints-met)
-   - [Build & verify](#build--verify)
-5. [C — Grace](#c--grace)
-   - [How it works](#how-it-works-1)
-   - [Constraints met](#constraints-met-1)
-   - [Build & verify](#build--verify-1)
-6. [C — Sully](#c--sully)
-   - [How it works](#how-it-works-2)
-   - [The `%%` trick](#the--trick)
-   - [Build & verify](#build--verify-2)
-7. [ASM Implementation](#asm-implementation)
-   - [How it works](#how-it-works-3)
-   - [Constraints met](#constraints-met-2)
-   - [Build & verify](#build--verify-3)
-8. [Quines: things to know](#quines-things-to-know)
+- [dr-quine](#dr-quine)
+  - [Table of Contents](#table-of-contents)
+  - [What is a Quine?](#what-is-a-quine)
+  - [Rules](#rules)
+  - [Project Structure](#project-structure)
+  - [C — Colleen](#c--colleen)
+    - [How it works](#how-it-works)
+    - [The technique — `%c` / `%s` trick](#the-technique--c--s-trick)
+    - [Constraints met](#constraints-met)
+    - [Build \& verify](#build--verify)
+  - [C — Grace](#c--grace)
+    - [How it works](#how-it-works-1)
+    - [Constraints met](#constraints-met-1)
+    - [Build \& verify](#build--verify-1)
+  - [C — Sully](#c--sully)
+    - [How it works](#how-it-works-2)
+    - [The `%%` trick](#the--trick)
+    - [Build \& verify](#build--verify-2)
+  - [ASM Implementation](#asm-implementation)
+    - [How it works](#how-it-works-3)
+    - [Constraints met](#constraints-met-2)
+    - [Build \& verify](#build--verify-3)
+  - [Quines: things to know](#quines-things-to-know)
 
 ---
 
@@ -49,6 +51,13 @@ The challenge: the program must carry a representation of itself inside its own 
 - **Three programs**: `Colleen`, `Grace`, `Sully` (executables with a capital letter).
 - Strict compilation: `-Wall -Wextra -Werror` for C, `nasm -f elf64` + `gcc` for ASM.
 - No crashes, no undefined behavior, no memory errors.
+- C comments must be formated as follow :
+
+```C
+1  /*
+2     Comment Here
+3  */
+```
 
 ---
 
