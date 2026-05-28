@@ -1,9 +1,9 @@
-NAME	= Colleen Grace #Sully
+NAME	= Colleen Grace Sully
 
 CC		= cc
 CFLAGS	= -Wall -Wextra -Werror
 
-SRCS	= colleen.c grace.c #sully.c
+SRCS	= colleen.c grace.c sully.c
 OBJS	= $(SRCS:.c=.o)
 
 all: $(NAME)
@@ -25,6 +25,7 @@ clean:
 
 fclean: clean
 	rm -f $(NAME)
+	rm -f Grace_kid.c
 
 re: fclean all
 
