@@ -24,10 +24,17 @@
     - [How it works](#how-it-works-2)
     - [The `%%` trick](#the--trick)
     - [Build \& verify](#build--verify-2)
-  - [ASM Implementation](#asm-implementation)
+  - [ASM — Colleen](#asm--colleen)
     - [How it works](#how-it-works-3)
+    - [The technique — positional specifiers](#the-technique--positional-specifiers)
     - [Constraints met](#constraints-met-2)
     - [Build \& verify](#build--verify-3)
+  - [ASM — Grace](#asm--grace)
+    - [How it works](#how-it-works-4)
+    - [The `%%` trick in NASM](#the--trick-in-nasm)
+    - [Constraints met](#constraints-met-3)
+    - [Build \& verify](#build--verify-4)
+  - [ASM — Sully](#asm--sully)
   - [Quines: things to know](#quines-things-to-know)
 
 ---
@@ -74,7 +81,7 @@ The challenge: the program must carry a representation of itself inside its own 
     ├── Makefile
     ├── colleen.s
     ├── grace.s
-    └── sully.s
+    └── sully.s       (to do)
 ```
 
 Each directory has its own `Makefile` with the standard rules: `all`, `clean`, `fclean`, `re`.
@@ -200,32 +207,96 @@ diff Sully_4.c C/sully.c # only line 5 (int i) should differ
 
 ---
 
-## ASM Implementation
+## ASM — Colleen
 
 ### How it works
 
-The same logic applies in Assembly: the source code (as text) is embedded in the `.data` section as a null-terminated string. Special characters (newlines, tabs, quotes) are handled by injecting their ASCII values at the right positions, using Linux syscalls (`write`) for output.
+Same principle as C/Colleen: the full source is stored as a format string `source` in `.data`. A `print` routine calls `printf(source, '\n', '"', source)` which replaces the format specifiers and reconstructs the source — including the `source: db "..."` line itself.
 
-For Grace and Sully the output goes through a file descriptor obtained via `open`/`creat`.
+The entry point is `global main`, linked via `gcc` (`nasm -f elf64` + `gcc -no-pie`). All memory references use RIP-relative addressing (`default rel`) for ASLR compatibility.
+
+### The technique — positional specifiers
+
+The C version uses sequential `%c`/`%s`. The ASM version uses **positional** specifiers so each argument can be referenced by index:
+
+| Specifier | Argument | Register | Value |
+|-----------|----------|----------|-------|
+| `%1$c`    | 1st      | `esi`    | 10 → `\n` |
+| `%2$c`    | 2nd      | `edx`    | 34 → `"` |
+| `%3$s`    | 3rd      | `rcx`    | `source` (raw bytes, no re-interpretation) |
+
+`xor eax, eax` before `call printf` sets the SSE argument count to 0 — mandatory for variadic functions in the System V x86-64 ABI.
 
 ### Constraints met
 
 | Requirement | Where |
 |---|---|
-| Clear entry point | `_start` label (linked via `gcc`) |
-| Extra routine called from entry point | helper routine (e.g. `print`) |
-| Comment outside entry point | in `.data` section or above `_start` |
-| Comment inside entry point or its immediate routine | inside `_start` or `print` |
+| Clear entry point | `global main` + `main:` label |
+| Extra routine called from entry point | `print:`, called from `main` |
+| Comment inside entry point | `; I Want to Make Free` inside `main` |
+| Comment outside entry point | `; It's a Quine of Magic` in `.data` |
 
 ### Build & verify
 
 ```bash
-cd ASM/
-make
-./Colleen | diff - colleen.s
-./Grace && diff Grace_kid.s grace.s
-./Sully && ls Sully* | wc -l
+cd ASM && make Colleen
+./Colleen | diff - colleen.s   # no output = perfect quine
 ```
+
+---
+
+## ASM — Grace
+
+### How it works
+
+Grace writes its own source to `Grace_kid.s` using `fopen` / `fprintf` / `fclose`. The entry point (`main`) is defined entirely inside a NASM `%macro`, invoked at the bottom of the file — satisfying the "program runs by calling a macro" constraint.
+
+Three NASM macros mirror the three `#define` of C/Grace:
+- `%define S` — the format string (same positional specifier trick as ASM/Colleen)
+- `%define N` — the output filename `"Grace_kid.s"`
+- `%macro MAIN 0` — the full `main` body, expanded once at the `MAIN` invocation line
+
+`fprintf` arguments follow the same register mapping as Colleen, with `rdi` carrying the `FILE*` (saved in `rbx` across calls since `rax` is clobbered by each `call`).
+
+Stack layout in `main`:
+
+```
+push rbp    → rsp % 16 == 0
+push rbx    → rsp % 16 == 8
+sub rsp, 8  → rsp % 16 == 0   ✓ aligned before every call
+```
+
+### The `%%` trick in NASM
+
+The format string must reproduce lines like `%%define S`, `%%macro MAIN 0`, `%%endmacro` in the output. `%%` in a C printf format string outputs a literal `%`. NASM stores `%%` as two raw bytes in the binary — fprintf then interprets them and emits a single `%`.
+
+| In `S`       | fprintf outputs | What appears in `Grace_kid.s` |
+|--------------|-----------------|-------------------------------|
+| `%%define`   | `%define`       | `%define S "..."`             |
+| `%%macro`    | `%macro`        | `%macro MAIN 0`               |
+| `%%endmacro` | `%endmacro`     | `%endmacro`                   |
+
+### Constraints met
+
+| Requirement | Where |
+|---|---|
+| No extra routines | only `main:` exists, defined inside `%macro MAIN 0` |
+| Exactly 3 macros | `%define S`, `%define N`, `%macro MAIN 0` |
+| One comment | `; It's a Quine of Magic` in `.data` |
+| Program runs by calling a macro | `MAIN` at end of file |
+
+### Build & verify
+
+```bash
+cd ASM && make Grace
+./Grace && diff Grace_kid.s grace.s   # no output = perfect quine
+```
+
+---
+
+## ASM — Sully
+
+> To do.
 
 ---
 
@@ -245,7 +316,12 @@ When the source itself contains `%d` or `%s` inside string literals (for `snprin
 
 **Verifying correctness**
 ```bash
+# C
 ./Colleen | diff - colleen.c          # pure quine: stdout == source
 ./Grace && diff Grace_kid.c grace.c   # file quine: written file == source
 ./Sully && diff Sully_4.c sully.c     # chain quine: only int i differs
+
+# ASM
+./Colleen | diff - colleen.s
+./Grace && diff Grace_kid.s grace.s
 ```
