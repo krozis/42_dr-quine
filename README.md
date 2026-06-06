@@ -35,6 +35,10 @@
     - [Constraints met](#constraints-met-3)
     - [Build \& verify](#build--verify-4)
   - [ASM — Sully](#asm--sully)
+    - [How it works](#how-it-works-5)
+    - [The `__?FILE?__` trick](#the-__file__-trick)
+    - [Build \& verify](#build--verify-5)
+  - [Bonus](#bonus)
   - [Quines: things to know](#quines-things-to-know)
 
 ---
@@ -81,7 +85,7 @@ The challenge: the program must carry a representation of itself inside its own 
     ├── Makefile
     ├── colleen.s
     ├── grace.s
-    └── sully.s       (to do)
+    └── sully.s
 ```
 
 Each directory has its own `Makefile` with the standard rules: `all`, `clean`, `fclean`, `re`.
@@ -296,7 +300,57 @@ cd ASM && make Grace
 
 ## ASM — Sully
 
-> To do.
+### How it works
+
+Sully is the ASM counterpart of C/Sully: a self-replicating chain that writes `Sully_X.s`, compiles it, and runs it if `X >= 0`.
+
+The key difference from the C version: instead of storing `i` as a `dd` value in `.data`, the integer is read at runtime from the **filename of the current binary** — via the NASM special token `__?FILE?__`.
+
+```
+; i = 5          ← comment showing the current value (reproduced by %4$d)
+default rel
+...
+fname: db __?FILE?__, 0   ← NASM embeds the source filename at assemble time
+```
+
+At startup, the code scans `fname` for an underscore. If found, the digit after it is the current `i`; decrement gives the value to write. If no underscore (original `sully.s`), the hardcoded default `mov ebx, 5` applies.
+
+```
+sully (ebx=5) → Sully_5.s → Sully_4.s → ... → Sully_0.s → stops
+```
+
+The `fprintf` call uses a 4th positional argument `%4$d` for the integer, in addition to the usual `%1$c` / `%2$c` / `%3$s` triple.
+
+The compile command (stored in `comp_fmt`) chains nasm + gcc + rm in a single `system()` call and has **5 occurrences of `%d`** — which requires passing 2 extra arguments on the stack beyond the 6 register slots.
+
+### The `__?FILE?__` trick
+
+`__?FILE?__` is a NASM built-in that expands to the current source filename **at assembly time**, not at runtime. It is reproduced literally by the format string (via `%3$s`) — each generated file gets its own name embedded when NASM assembles it.
+
+| File assembled | `fname` contains |
+|----------------|-----------------|
+| `sully.s`      | `"sully.s"`     |
+| `Sully_4.s`    | `"Sully_4.s"`   |
+
+This lets every generation determine its own `i` without any mutable data in `.data`.
+
+### Build & verify
+
+```bash
+cd ASM && make Sully
+./Sully
+diff Sully_5.s sully.s          # Sully_5.s is identical to sully.s
+diff <(sed 's/; i = .*/; i = X/' Sully_4.s) \
+     <(sed 's/; i = .*/; i = X/' Sully_3.s)  # all generations identical modulo i
+```
+
+---
+
+## Bonus
+
+> To do — reimplement the full project in a third language (not C, not ASM, not a trivial C→C++ copy).
+
+The bonus is only evaluated if the mandatory part is perfect. The chosen language must handle the quine constraint natively (no file reads, no external input). In languages without a preprocessor or macro system, the `#define` / `%macro` patterns from Grace are replaced by the language's equivalent construct.
 
 ---
 
@@ -324,4 +378,5 @@ When the source itself contains `%d` or `%s` inside string literals (for `snprin
 # ASM
 ./Colleen | diff - colleen.s
 ./Grace && diff Grace_kid.s grace.s
+./Sully && diff Sully_5.s sully.s   # chain quine: Sully_5 == sully, others differ only in i
 ```
